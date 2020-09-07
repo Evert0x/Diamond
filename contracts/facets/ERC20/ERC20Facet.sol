@@ -7,6 +7,7 @@ import "../../openzeppelin/math/SafeMath.sol";
 import "../../libraries/LibDiamondStorage.sol";
 
 import "./LibERC20Storage.sol";
+import "./LibERC20.sol";
 
 contract ERC20Facet is IERC20 {
     using SafeMath for uint256;
@@ -18,7 +19,7 @@ contract ERC20Facet is IERC20 {
         address currentOwner = ds.contractOwner;
         require(msg.sender == currentOwner, "Must own the contract.");
 
-        _mint(msg.sender, _initialSupply);
+        LibERC20.mint(msg.sender, _initialSupply);
 
         es.name = _name;
         es.symbol = _symbol;
@@ -59,23 +60,6 @@ contract ERC20Facet is IERC20 {
 
     function totalSupply() external view override returns (uint256) {
         return LibERC20Storage.erc20Storage().totalSupply;
-    }
-
-    function _mint(address _to, uint256 _amount) internal {
-        LibERC20Storage.ERC20Storage storage es = LibERC20Storage.erc20Storage();
-
-        es.balances[_to] = es.balances[_to].add(_amount);
-        es.totalSupply = es.totalSupply.add(_amount);
-
-        emit Transfer(address(0), _to, _amount);
-    }
-
-    function _burn(address _from, uint256 _amount) internal {
-        LibERC20Storage.ERC20Storage storage es = LibERC20Storage.erc20Storage();
-
-        es.balances[_from] = es.balances[_from].sub(_amount);
-        es.totalSupply = es.totalSupply.sub(_amount);
-        emit Transfer(_from, address(0), _amount);
     }
 
     function _transfer(address _from, address _to, uint256 _amount) internal {
