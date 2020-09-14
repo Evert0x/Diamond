@@ -5,9 +5,10 @@ import "../../openzeppelin/math/SafeMath.sol";
 import "../ERC20/LibERC20Storage.sol";
 import "../ERC20/LibERC20.sol";
 import "./LibBasketStorage.sol";
+import "../../libraries/LibDiamondStorage.sol";
 
 contract BasketFacet {
-    using  SafeMath for uint256;
+    using SafeMath for uint256;
     function initialize(address[] memory _tokens) external {
         LibBasketStorage.BasketStorage storage bs = LibBasketStorage.basketStorage();
 
@@ -18,6 +19,7 @@ contract BasketFacet {
     }
 
     function joinPool(uint256 _amount) external {
+        require(!this.getLock(), "POOL_LOCKED");
         LibBasketStorage.BasketStorage storage bs = LibBasketStorage.basketStorage();
         uint256 totalSupply = LibERC20Storage.erc20Storage().totalSupply;
 
@@ -35,6 +37,7 @@ contract BasketFacet {
 
     // Must be overwritten to withdraw from strategies
     function exitPool(uint256 _amount) external virtual {
+        require(!this.getLock(), "POOL_LOCKED");
         LibBasketStorage.BasketStorage storage bs = LibBasketStorage.basketStorage();
         uint256 totalSupply = LibERC20Storage.erc20Storage().totalSupply;
 
@@ -44,6 +47,19 @@ contract BasketFacet {
             require(token.transfer(msg.sender, tokenAmount), "Transfer Failed");
         }
 
+    }
+
+    function getLock() external view returns(bool){
+        return LibBasketStorage.basketStorage().lock;
+    }
+
+    function setLock(bool _lock) external {
+        // Maybe remove the first check
+        require(
+            msg.sender == LibDiamondStorage.diamondStorage().contractOwner ||
+            msg.sender == address(this)
+        );
+        LibBasketStorage.basketStorage().lock = _lock;
     }
 
     // Seperated balance function to allow yearn like strategies to be hooked up by inheriting from this contract and overriding

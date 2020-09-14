@@ -7,6 +7,7 @@ library LibBasketStorage {
     bytes32 constant BASKET_STORAGE_POSITION = keccak256("diamond.standard.basket.storage");
 
     struct BasketStorage {
+        bool lock;
         IERC20[] tokens;
         mapping(address => bool) inPool;
     }

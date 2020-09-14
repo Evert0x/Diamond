@@ -78,18 +78,27 @@ contract('FacetTest', async accounts => {
         assert.equal(state.support, false)
         assert.equal(state.votes, 0)
 
+         // Assert the pie is unlocked
+         lock = await basketFacet.methods.getLock().call();
+         assert.equal(lock, false);
+
+        //basketFacet.methods.setLock(true).send({from: web3.eth.defaultAccount, gas: 1000000})
         // Cast vote from the pie
         diamondGov = new web3.eth.Contract(GovernorAlpha.abi, gov.address)
         await callFacet.methods.call(
-          [gov.address],
-          [diamondGov.methods.castVote(1, true).encodeABI()],
-          [0]
-        ).send({from: web3.eth.defaultAccount})
+          [diamond.address, gov.address],
+          [basketFacet.methods.setLock(true).encodeABI(), diamondGov.methods.castVote(1, true).encodeABI()],
+          [0, 0]
+        ).send({from: web3.eth.defaultAccount, gas: 1000000})
 
         // Assert the pie has voted
         state = await gov.getReceipt(proposalId, diamond.address);
         assert.equal(state.hasVoted, true)
         assert.equal(state.support, true)
         assert.equal(state.votes, ether)
+
+        // Assert the pie is locked
+        lock = await basketFacet.methods.getLock().call();
+        assert.equal(lock, true);
     });
 });
