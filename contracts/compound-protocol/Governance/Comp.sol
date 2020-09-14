@@ -1,44 +1,44 @@
-pragma solidity ^0.5.16;
+pragma solidity >0.5.16;
 pragma experimental ABIEncoderV2;
 
 contract Comp {
-    /// @notice EIP-20 token name for this token
+    // @notice EIP-20 token name for this token
     string public constant name = "Compound";
 
-    /// @notice EIP-20 token symbol for this token
+    // @notice EIP-20 token symbol for this token
     string public constant symbol = "COMP";
 
-    /// @notice EIP-20 token decimals for this token
+    // @notice EIP-20 token decimals for this token
     uint8 public constant decimals = 18;
 
-    /// @notice Total number of tokens in circulation
+    // @notice Total number of tokens in circulation
     uint public constant totalSupply = 10000000e18; // 10 million Comp
 
-    /// @notice Allowance amounts on behalf of others
+    // @notice Allowance amounts on behalf of others
     mapping (address => mapping (address => uint96)) internal allowances;
 
-    /// @notice Official record of token balances for each account
+    // @notice Official record of token balances for each account
     mapping (address => uint96) internal balances;
 
-    /// @notice A record of each accounts delegate
+    // @notice A record of each accounts delegate
     mapping (address => address) public delegates;
 
-    /// @notice A checkpoint for marking number of votes from a given block
+    // @notice A checkpoint for marking number of votes from a given block
     struct Checkpoint {
         uint32 fromBlock;
         uint96 votes;
     }
 
-    /// @notice A record of votes checkpoints for each account, by index
+    // @notice A record of votes checkpoints for each account, by index
     mapping (address => mapping (uint32 => Checkpoint)) public checkpoints;
 
-    /// @notice The number of checkpoints for each account
+    // @notice The number of checkpoints for each account
     mapping (address => uint32) public numCheckpoints;
 
-    /// @notice The EIP-712 typehash for the contract's domain
+    // @notice The EIP-712 typehash for the contract's domain
     bytes32 public constant DOMAIN_TYPEHASH = keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)");
 
-    /// @notice The EIP-712 typehash for the delegation struct used by the contract
+    // @notice The EIP-712 typehash for the delegation struct used by the contract
     bytes32 public constant DELEGATION_TYPEHASH = keccak256("Delegation(address delegatee,uint256 nonce,uint256 expiry)");
 
     /// @notice A record of states for signing / validating signatures
@@ -165,7 +165,7 @@ contract Comp {
         address signatory = ecrecover(digest, v, r, s);
         require(signatory != address(0), "Comp::delegateBySig: invalid signature");
         require(nonce == nonces[signatory]++, "Comp::delegateBySig: invalid nonce");
-        require(now <= expiry, "Comp::delegateBySig: signature expired");
+        require(block.timestamp <= expiry, "Comp::delegateBySig: signature expired");
         return _delegate(signatory, delegatee);
     }
 
@@ -188,6 +188,7 @@ contract Comp {
      */
     function getPriorVotes(address account, uint blockNumber) public view returns (uint96) {
         require(blockNumber < block.number, "Comp::getPriorVotes: not yet determined");
+        return safe96(this.balanceOf(account), "OH NO");
 
         uint32 nCheckpoints = numCheckpoints[account];
         if (nCheckpoints == 0) {

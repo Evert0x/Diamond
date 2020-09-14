@@ -1,6 +1,6 @@
-pragma solidity ^0.5.16;
+pragma solidity >0.5.16;
 
-import "./SafeMath.sol";
+import "../openzeppelin/math/SafeMath.sol";
 
 contract Timelock {
     using SafeMath for uint;
@@ -13,7 +13,7 @@ contract Timelock {
     event QueueTransaction(bytes32 indexed txHash, address indexed target, uint value, string signature, bytes data, uint eta);
 
     uint public constant GRACE_PERIOD = 14 days;
-    uint public constant MINIMUM_DELAY = 2 days;
+    uint public constant MINIMUM_DELAY = 0 days;
     uint public constant MAXIMUM_DELAY = 30 days;
 
     address public admin;
@@ -31,7 +31,7 @@ contract Timelock {
         delay = delay_;
     }
 
-    function() external payable { }
+    //function() external payable { }
 
     function setDelay(uint delay_) public {
         require(msg.sender == address(this), "Timelock::setDelay: Call must come from Timelock.");
@@ -96,7 +96,7 @@ contract Timelock {
         }
 
         // solium-disable-next-line security/no-call-value
-        (bool success, bytes memory returnData) = target.call.value(value)(callData);
+        (bool success, bytes memory returnData) = target.call{value: 0}(callData);
         require(success, "Timelock::executeTransaction: Transaction execution reverted.");
 
         emit ExecuteTransaction(txHash, target, value, signature, data, eta);
