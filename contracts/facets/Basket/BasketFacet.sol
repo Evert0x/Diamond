@@ -23,7 +23,9 @@ contract BasketFacet {
 
         for(uint256 i; i < bs.tokens.length; i ++) {
             IERC20 token = bs.tokens[i];
-            uint256 tokenAmount = balance(address(token)).mul(_amount).div(totalSupply);
+            // this line below does not work in initial state.
+            //uint256 tokenAmount = balance(address(token)).mul(_amount).div(totalSupply);
+            uint256 tokenAmount = _amount;
             require(token.transferFrom(msg.sender, address(this), tokenAmount), "Transfer Failed");
         }
 
