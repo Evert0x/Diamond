@@ -9,13 +9,27 @@ import "../../libraries/LibDiamondStorage.sol";
 
 contract BasketFacet {
     using SafeMath for uint256;
+
+    constructor() public {
+        // Lock the pool on creating the contract
+        LibBasketStorage.basketStorage().lock = true;
+    }
+
+    // Before calling the first joinPool, the pools needs to be initialized with token balances
     function initialize(address[] memory _tokens) external {
+        LibDiamondStorage.DiamondStorage storage ds = LibDiamondStorage.diamondStorage();
         LibBasketStorage.BasketStorage storage bs = LibBasketStorage.basketStorage();
+
+        require(msg.sender == ds.contractOwner, "Must own the contract.");
 
         for (uint256 i = 0; i < _tokens.length; i ++) {
             bs.tokens.push(IERC20(_tokens[i]));
             bs.inPool[_tokens[i]] = true;
+            // requires some initial supply, could be less than 1 gwei, but yea.
+            require(balance(_tokens[i]) >= 1 gwei, "TOKEN_BALANCE_TOO_LOW");
         }
+
+        this.setLock(false);
     }
 
     function joinPool(uint256 _amount) external {
@@ -25,9 +39,7 @@ contract BasketFacet {
 
         for(uint256 i; i < bs.tokens.length; i ++) {
             IERC20 token = bs.tokens[i];
-            // this line below does not work in initial state.
-            //uint256 tokenAmount = balance(address(token)).mul(_amount).div(totalSupply);
-            uint256 tokenAmount = _amount;
+            uint256 tokenAmount = balance(address(token)).mul(_amount).div(totalSupply);
             require(token.transferFrom(msg.sender, address(this), tokenAmount), "Transfer Failed");
         }
 

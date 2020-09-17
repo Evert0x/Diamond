@@ -5,6 +5,7 @@ const CallFacet = artifacts.require('CallFacet')
 const BasketFacet = artifacts.require('BasketFacet')
 const Comp = artifacts.require('Comp')
 const Timelock = artifacts.require('Timelock')
+const ERC20Facet = artifacts.require('ERC20Facet')
 const GovernorAlpha = artifacts.require('GovernorAlpha')
 
 module.exports = function (deployer, network, accounts) {
@@ -16,6 +17,7 @@ module.exports = function (deployer, network, accounts) {
     await deployer.deploy(Test1Facet)
     await deployer.deploy(Test2Facet)
     await deployer.deploy(CallFacet)
+    await deployer.deploy(ERC20Facet)
     await deployer.deploy(BasketFacet)
     await deployer.deploy(Comp, accounts[0])
     await deployer.deploy(Timelock, accounts[0], 0)

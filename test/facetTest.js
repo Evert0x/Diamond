@@ -8,6 +8,7 @@ const OwnershipFacet = artifacts.require('OwnershipFacet')
 const CallFacet = artifacts.require('CallFacet')
 const BasketFacet = artifacts.require('BasketFacet')
 const Comp = artifacts.require('Comp')
+const ERC20Facet = artifacts.require('ERC20Facet')
 const GovernorAlpha = artifacts.require('GovernorAlpha')
 let zeroAddress = '0x0000000000000000000000000000000000000000'
 contract('FacetTest', async accounts => {
@@ -17,6 +18,7 @@ contract('FacetTest', async accounts => {
     let callFacet;
     let basketFacet;
     let addresses
+    let erc20Facet;
 
     function getSelectors (contract) {
       const selectors = contract.abi.reduce((acc, val) => {
@@ -38,6 +40,7 @@ contract('FacetTest', async accounts => {
         const ownershipFacet = new web3.eth.Contract(OwnershipFacet.abi, diamond.address)
         callFacet = await CallFacet.deployed()
         basketFacet = await BasketFacet.deployed()
+        erc20Facet = await ERC20Facet.deployed()
         addresses = await diamondLoupeFacet.methods.facetAddresses().call()
 
         // Attach callFacet to diamond
@@ -54,28 +57,55 @@ contract('FacetTest', async accounts => {
           [[basketFacet.address, selectors]], zeroAddress, '0x'
         ).send({ from: web3.eth.defaultAccount, gas: 1000000 })
 
+        selectors = getSelectors(erc20Facet)
+        addresses.push(erc20Facet.address)
+        await diamondCutFacet.methods.diamondCut(
+          [[erc20Facet.address, selectors]], zeroAddress, '0x'
+        ).send({ from: web3.eth.defaultAccount, gas: 1000000 })
+
         // Reinitialize both callFacet and basketFacet.
         // Using the diamond address
         callFacet = new web3.eth.Contract(CallFacet.abi, diamond.address);
         basketFacet = new web3.eth.Contract(BasketFacet.abi, diamond.address);
+        erc20Facet = new web3.eth.Contract(ERC20Facet.abi, diamond.address);
     });
 
     // the amounts in this test are not realistic
     //    see Comp.sol @ getPriorVotes
     //    see BasketFacet.sol @ joinPool
     // the compound contracts are heavily edited for testing purposes
-    it('Join comp pool and vote', async () => {
+    it.only('Join comp pool and vote', async () => {
         let ether = web3.utils.toWei("1", "ether");
         diamond = await Diamond.deployed()
         comp = await Comp.deployed()
         gov = await GovernorAlpha.deployed()
 
+        // transfer initial tokens (otherwise initialize fails)
+        await comp.transfer(diamond.address, ether);
+
         // initalize facet
-        await basketFacet.methods.initialize([comp.address]).send({from: web3.eth.defaultAccount, gas: 1000000});
+        await basketFacet.methods.initialize(
+          [comp.address]
+        ).send({from: web3.eth.defaultAccount, gas: 1000000});
+
+        await erc20Facet.methods.initialize(
+          ether, "TEST 1", "TST1", 18
+        ).send({from: web3.eth.defaultAccount, gas: 1000000});
+        // check pie balance
+        balance = await erc20Facet.methods.balanceOf(web3.eth.defaultAccount).call();
+        assert.equal(balance, ether);
+
         await comp.approve(diamond.address, web3.utils.toWei("100", "ether"));
         await basketFacet.methods.joinPool(ether).send({from: web3.eth.defaultAccount, gas: 1000000});
+
+        // check pie balance
+        balance = await erc20Facet.methods.balanceOf(web3.eth.defaultAccount).call();
+        assert.equal(balance, web3.utils.toWei("2", "ether"));
+
+        // Check diamond token asset balance
         amount = await comp.balanceOf(diamond.address)
-        assert.equal(amount, ether);
+        // the initial comp + joined
+        assert.equal(amount, web3.utils.toWei("2", "ether"));
 
         // Create a compound proposal
         proposal = await gov.propose([zeroAddress], [1], ["t"], ["0x1"], "test")
@@ -105,7 +135,7 @@ contract('FacetTest', async accounts => {
         state = await gov.getReceipt(proposalId, diamond.address);
         assert.equal(state.hasVoted, true)
         assert.equal(state.support, true)
-        assert.equal(state.votes, ether)
+        assert.equal(state.votes, web3.utils.toWei("2", "ether"))
 
         // Assert the pie is locked
         lock = await basketFacet.methods.getLock().call();
