@@ -124,10 +124,12 @@ contract('FacetTest', async accounts => {
 
         //basketFacet.methods.setLock(true).send({from: web3.eth.defaultAccount, gas: 1000000})
         // Cast vote from the pie
+        const latest = await web3.eth.getBlockNumber();
+
         diamondGov = new web3.eth.Contract(GovernorAlpha.abi, gov.address)
         await callFacet.methods.call(
           [diamond.address, gov.address],
-          [basketFacet.methods.setLock(true).encodeABI(), diamondGov.methods.castVote(1, true).encodeABI()],
+          [basketFacet.methods.setLock(latest + 100).encodeABI(), diamondGov.methods.castVote(1, true).encodeABI()],
           [0, 0]
         ).send({from: web3.eth.defaultAccount, gas: 1000000})
 

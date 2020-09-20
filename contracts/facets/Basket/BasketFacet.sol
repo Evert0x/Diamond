@@ -10,11 +10,6 @@ import "../../libraries/LibDiamondStorage.sol";
 contract BasketFacet {
     using SafeMath for uint256;
 
-    constructor() public {
-        // Lock the pool on creating the contract
-        LibBasketStorage.basketStorage().lock = true;
-    }
-
     // Before calling the first joinPool, the pools needs to be initialized with token balances
     function initialize(address[] memory _tokens) external {
         LibDiamondStorage.DiamondStorage storage ds = LibDiamondStorage.diamondStorage();
@@ -29,7 +24,8 @@ contract BasketFacet {
             require(balance(_tokens[i]) >= 1 gwei, "TOKEN_BALANCE_TOO_LOW");
         }
 
-        this.setLock(false);
+        // unlock the contract
+        this.setLock(block.number);
     }
 
     function joinPool(uint256 _amount) external {
@@ -61,17 +57,20 @@ contract BasketFacet {
 
     }
 
+    // returns true when locked
     function getLock() external view returns(bool){
-        return LibBasketStorage.basketStorage().lock;
+        LibBasketStorage.BasketStorage storage bs = LibBasketStorage.basketStorage();
+        return bs.lockBlock == 0 || bs.lockBlock >= block.number;
     }
 
-    function setLock(bool _lock) external {
+    // lock up to and including _lock blocknumber
+    function setLock(uint256 _lock) external {
         // Maybe remove the first check
         require(
             msg.sender == LibDiamondStorage.diamondStorage().contractOwner ||
             msg.sender == address(this)
         );
-        LibBasketStorage.basketStorage().lock = _lock;
+        LibBasketStorage.basketStorage().lockBlock = _lock;
     }
 
     // Seperated balance function to allow yearn like strategies to be hooked up by inheriting from this contract and overriding
