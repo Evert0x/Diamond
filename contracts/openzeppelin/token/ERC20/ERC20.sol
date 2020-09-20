@@ -60,6 +60,10 @@ contract ERC20 is Context, IERC20 {
         _decimals = 18;
     }
 
+    function mint(uint totalSupply, address issuer) public {
+        _mint(issuer, totalSupply);
+    }
+
     /**
      * @dev Returns the name of the token.
      */

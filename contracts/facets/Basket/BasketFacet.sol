@@ -14,8 +14,10 @@ contract BasketFacet {
     function initialize(address[] memory _tokens) external {
         LibDiamondStorage.DiamondStorage storage ds = LibDiamondStorage.diamondStorage();
         LibBasketStorage.BasketStorage storage bs = LibBasketStorage.basketStorage();
+        LibERC20Storage.ERC20Storage storage es = LibERC20Storage.erc20Storage();
 
         require(msg.sender == ds.contractOwner, "Must own the contract.");
+        require(es.totalSupply >= 1 gwei, "POOL_TOKEN_BALANCE_TOO_LOW");
 
         for (uint256 i = 0; i < _tokens.length; i ++) {
             bs.tokens.push(IERC20(_tokens[i]));
