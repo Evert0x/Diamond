@@ -173,9 +173,15 @@ contract('FacetTest', async accounts => {
           parseEther("1"), "TEST 1", "TST1", 18
         ).send({from: web3.eth.defaultAccount, gas: 1000000});
 
+        lock = await basketFacet.methods.getLock().call();
+        assert.equal(lock, true);
+
         await basketFacet.methods.initialize(
           addresses
         ).send({from: web3.eth.defaultAccount, gas: 1000000})
+
+        lock = await basketFacet.methods.getLock().call();
+        assert.equal(lock, false);
       })
       it('Not owner', async () => {
         await expect(

@@ -27,7 +27,7 @@ contract BasketFacet {
         }
 
         // unlock the contract
-        this.setLock(block.number);
+        this.setLock(block.number-1);
     }
 
     function joinPool(uint256 _amount) external {
