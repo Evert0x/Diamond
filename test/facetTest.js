@@ -1,6 +1,6 @@
 /* eslint-disable prefer-const */
 /* global contract artifacts web3 before it assert */
-
+const { parseEther } = require('ethers/lib/utils')
 const Diamond = artifacts.require('Diamond')
 const DiamondCutFacet = artifacts.require('DiamondCutFacet')
 const DiamondLoupeFacet = artifacts.require('DiamondLoupeFacet')
@@ -57,13 +57,14 @@ contract('FacetTest', async accounts => {
           [[basketFacet.address, selectors]], zeroAddress, '0x'
         ).send({ from: web3.eth.defaultAccount, gas: 1000000 })
 
+        // Attach erc20facet to diamond
         selectors = getSelectors(erc20Facet)
         addresses.push(erc20Facet.address)
         await diamondCutFacet.methods.diamondCut(
           [[erc20Facet.address, selectors]], zeroAddress, '0x'
         ).send({ from: web3.eth.defaultAccount, gas: 1000000 })
 
-        // Reinitialize both callFacet and basketFacet.
+        // Reinitialize both callFacet, basketFacet and erc20Facet.
         // Using the diamond address
         callFacet = new web3.eth.Contract(CallFacet.abi, diamond.address);
         basketFacet = new web3.eth.Contract(BasketFacet.abi, diamond.address);
@@ -75,13 +76,12 @@ contract('FacetTest', async accounts => {
     //    see BasketFacet.sol @ joinPool
     // the compound contracts are heavily edited for testing purposes
     it.only('Join comp pool and vote', async () => {
-        let ether = web3.utils.toWei("1", "ether");
         diamond = await Diamond.deployed()
         comp = await Comp.deployed()
         gov = await GovernorAlpha.deployed()
 
         // transfer initial tokens (otherwise initialize fails)
-        await comp.transfer(diamond.address, ether);
+        await comp.transfer(diamond.address, parseEther("1"));
 
         // initalize facet
         await basketFacet.methods.initialize(
@@ -89,23 +89,23 @@ contract('FacetTest', async accounts => {
         ).send({from: web3.eth.defaultAccount, gas: 1000000});
 
         await erc20Facet.methods.initialize(
-          ether, "TEST 1", "TST1", 18
+          parseEther("1"), "TEST 1", "TST1", 18
         ).send({from: web3.eth.defaultAccount, gas: 1000000});
         // check pie balance
         balance = await erc20Facet.methods.balanceOf(web3.eth.defaultAccount).call();
-        assert.equal(balance, ether);
+        assert.equal(balance, parseEther("1"));
 
-        await comp.approve(diamond.address, web3.utils.toWei("100", "ether"));
-        await basketFacet.methods.joinPool(ether).send({from: web3.eth.defaultAccount, gas: 1000000});
+        await comp.approve(diamond.address, parseEther("100"));
+        await basketFacet.methods.joinPool(parseEther("1")).send({from: web3.eth.defaultAccount, gas: 1000000});
 
         // check pie balance
         balance = await erc20Facet.methods.balanceOf(web3.eth.defaultAccount).call();
-        assert.equal(balance, web3.utils.toWei("2", "ether"));
+        assert.equal(balance, parseEther("2"));
 
         // Check diamond token asset balance
         amount = await comp.balanceOf(diamond.address)
         // the initial comp + joined
-        assert.equal(amount, web3.utils.toWei("2", "ether"));
+        expect(amount.eq(parseEther("2")));
 
         // Create a compound proposal
         proposal = await gov.propose([zeroAddress], [1], ["t"], ["0x1"], "test")
@@ -137,7 +137,7 @@ contract('FacetTest', async accounts => {
         state = await gov.getReceipt(proposalId, diamond.address);
         assert.equal(state.hasVoted, true)
         assert.equal(state.support, true)
-        assert.equal(state.votes, web3.utils.toWei("2", "ether"))
+        assert.equal(state.votes, parseEther("2"))
 
         // Assert the pie is locked
         lock = await basketFacet.methods.getLock().call();
