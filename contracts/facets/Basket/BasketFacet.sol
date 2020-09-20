@@ -57,6 +57,7 @@ contract BasketFacet {
             require(token.transfer(msg.sender, tokenAmount), "Transfer Failed");
         }
 
+        LibERC20.burn(msg.sender, _amount);
     }
 
     // returns true when locked

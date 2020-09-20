@@ -103,11 +103,12 @@ contract('FacetTest', async accounts => {
         }
     });
 
-    it('Test lock', async () => {
-        // default is locked
+    describe("Lock", async() => {
+      it('Check default locked', async () => {
         lock = await basketFacet.methods.getLock().call();
         assert.equal(lock, true);
-
+      });
+      it('Check past lock', async () => {
         // set blockNumber to at least 2
         await waitNBlocks(2);
 
@@ -115,27 +116,32 @@ contract('FacetTest', async accounts => {
         await basketFacet.methods.setLock(1).send({from: web3.eth.defaultAccount, gas: 1000000});
         lock = await basketFacet.methods.getLock().call();
         assert.equal(lock, false);
-
+      });
+      it('Check future lock', async () => {
         latestBlock = await web3.eth.getBlockNumber();
         // set lock in the future
         await basketFacet.methods.setLock(latestBlock + 1).send({from: web3.eth.defaultAccount, gas: 1000000});
         lock = await basketFacet.methods.getLock().call();
         assert.equal(lock, true);
-
+      });
+      it('Check current block lock', async () => {
         // assert lock == currentblock
         assert.equal(await web3.eth.getBlockNumber(), latestBlock + 1);
 
         // should still be locked (block is including)
         lock = await basketFacet.methods.getLock().call();
         assert.equal(lock, true);
-
+      });
+      it('Wait for lock expires', async () => {
         await waitNBlocks(1);
         assert.equal(await web3.eth.getBlockNumber(), latestBlock + 2);
 
         // should be unlocked
         lock = await basketFacet.methods.getLock().call();
         assert.equal(lock, false);
-    })
+      })
+    });
+
 
     describe("Initalize", async() => {
       it('Not enough pool balance', async () => {
@@ -147,41 +153,14 @@ contract('FacetTest', async accounts => {
       })
       it('Not enough token balance', async () => {
         await erc20Facet.methods.initialize(
-          parseEther("1"), "TEST 1", "TST1", 18
+          parseEther("10"), "TEST 1", "TST1", 18
         ).send({from: web3.eth.defaultAccount, gas: 1000000});
-
-        await tokens[0].methods.transfer(diamond.address, web3.utils.toWei('0.9', 'gwei')).send(
-          {from: web3.eth.defaultAccount, gas: 1000000}
-        );
 
         await expect(
           basketFacet.methods.initialize(
             [tokens[0].options.address]
           ).send({from: web3.eth.defaultAccount, gas: 1000000})
         ).to.be.revertedWith("TOKEN_BALANCE_TOO_LOW");
-      })
-      it('Successful initialize', async () => {
-        addresses = []
-        for (var i = 0; i < tokens.length; i++) {
-          await tokens[i].methods.transfer(diamond.address, parseEther("1")).send(
-            {from: web3.eth.defaultAccount, gas: 1000000}
-          )
-          addresses.push(tokens[i].options.address)
-        }
-
-        await erc20Facet.methods.initialize(
-          parseEther("1"), "TEST 1", "TST1", 18
-        ).send({from: web3.eth.defaultAccount, gas: 1000000});
-
-        lock = await basketFacet.methods.getLock().call();
-        assert.equal(lock, true);
-
-        await basketFacet.methods.initialize(
-          addresses
-        ).send({from: web3.eth.defaultAccount, gas: 1000000})
-
-        lock = await basketFacet.methods.getLock().call();
-        assert.equal(lock, false);
       })
       it('Not owner', async () => {
         await expect(
@@ -190,5 +169,119 @@ contract('FacetTest', async accounts => {
           ).send({from: accounts[1], gas: 1000000})
         ).to.be.revertedWith("Must own the contract.");
       })
+      it('Initialize successful', async () => {
+        // set lock
+        await basketFacet.methods.setLock(0).send(
+          {from: web3.eth.defaultAccount, gas: 1000000}
+        );
+
+        addresses = []
+        for (var i = 0; i < tokens.length; i++) {
+          await tokens[i].methods.transfer(diamond.address, parseEther("100")).send(
+            {from: web3.eth.defaultAccount, gas: 1000000}
+          )
+          await tokens[i].methods.approve(diamond.address, parseEther("100000000")).send(
+            {from: web3.eth.defaultAccount, gas: 1000000}
+          )
+          addresses.push(tokens[i].options.address)
+        }
+
+        lock = await basketFacet.methods.getLock().call();
+        assert.equal(lock, true);
+
+        // finaly initialize pool
+        await basketFacet.methods.initialize(
+          addresses
+        ).send({from: web3.eth.defaultAccount, gas: 1000000})
+
+        lock = await basketFacet.methods.getLock().call();
+        assert.equal(lock, false);
+      })
+    })
+
+    describe("Joining and exiting", async() => {
+        // transfer initial token liquidity
+        before(async () => {
+          latestBlock = await web3.eth.getBlockNumber();
+        });
+
+        it('Test locks', async () => {
+            await basketFacet.methods.setLock(latestBlock + 5).send({
+              from: web3.eth.defaultAccount, gas: 1000000
+            })
+
+            await expect(
+              basketFacet.methods.joinPool(
+                parseEther("1")
+              ).send({from: web3.eth.defaultAccount, gas: 1000000})
+            ).to.be.revertedWith("POOL_LOCKED");
+
+            await expect(
+              basketFacet.methods.exitPool(
+                parseEther("1")
+              ).send({from: web3.eth.defaultAccount, gas: 1000000})
+            ).to.be.revertedWith("POOL_LOCKED");
+
+            // skip for oncoming tests
+            await waitNBlocks(5);
+        })
+        it('Join pool', async () => {
+          for (var i = 0; i < tokens.length; i++) {
+            balanceDiamond = await tokens[i].methods.balanceOf(diamond.address).call()
+            expect(balanceDiamond).to.eq(parseEther("100"))
+
+            // validate internal balance call
+            balanceDiamondInternal = await basketFacet.methods.balance(tokens[i].options.address).call()
+            expect(balanceDiamondInternal).to.eq(balanceDiamond)
+
+            balanceUser = await tokens[i].methods.balanceOf(web3.eth.defaultAccount).call()
+            expect(balanceUser).to.eq(parseEther("900"))
+          }
+          // if this line fail, please run the initialize tests
+          tokensUser = await erc20Facet.methods.balanceOf(web3.eth.defaultAccount).call()
+          expect(tokensUser).to.eq(parseEther("10"))
+
+          await basketFacet.methods.joinPool(
+            parseEther("10")
+          ).send({from: web3.eth.defaultAccount, gas: 1000000})
+
+          for (var i = 0; i < tokens.length; i++) {
+            balanceDiamond = await tokens[i].methods.balanceOf(diamond.address).call()
+            expect(balanceDiamond).to.eq(parseEther("200"))
+
+            balanceUser = await tokens[i].methods.balanceOf(web3.eth.defaultAccount).call()
+            expect(balanceUser).to.eq(parseEther("800"))
+          }
+          tokensUser = await erc20Facet.methods.balanceOf(web3.eth.defaultAccount).call()
+          expect(tokensUser).to.eq(parseEther("20"))
+        })
+        it('Exit pool', async () => {
+          await basketFacet.methods.exitPool(
+            parseEther("5")
+          ).send({from: web3.eth.defaultAccount, gas: 1000000})
+          for (var i = 0; i < tokens.length; i++) {
+            balanceDiamond = await tokens[i].methods.balanceOf(diamond.address).call()
+            expect(balanceDiamond).to.eq(parseEther("150"))
+
+            balanceUser = await tokens[i].methods.balanceOf(web3.eth.defaultAccount).call()
+            expect(balanceUser).to.eq(parseEther("850"))
+          }
+          tokensUser = await erc20Facet.methods.balanceOf(web3.eth.defaultAccount).call()
+          expect(tokensUser).to.eq(parseEther("15"))
+        })
+        it('Join fails if it exceeds balance', async () => {
+          await expect(
+            basketFacet.methods.joinPool(
+              parseEther("10000")
+            ).send({from: web3.eth.defaultAccount, gas: 1000000})
+          ).to.be.revertedWith("transfer amount exceeds balance")
+        })
+        it('Exit fails if it exceeds balance', async () => {
+          await expect(
+            basketFacet.methods.exitPool(
+              parseEther("20")
+            ).send({from: web3.eth.defaultAccount, gas: 1000000})
+          ).to.be.revertedWith("transfer amount exceeds balance")
+        })
     })
 });
