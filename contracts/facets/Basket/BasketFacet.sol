@@ -10,6 +10,8 @@ import "../../libraries/LibDiamondStorage.sol";
 contract BasketFacet {
     using SafeMath for uint256;
 
+    uint256 constant MIN_AMOUNT = 1 gwei;
+
     // Before calling the first joinPool, the pools needs to be initialized with token balances
     function initialize(address[] memory _tokens) external {
         LibDiamondStorage.DiamondStorage storage ds = LibDiamondStorage.diamondStorage();
@@ -17,13 +19,13 @@ contract BasketFacet {
         LibERC20Storage.ERC20Storage storage es = LibERC20Storage.erc20Storage();
 
         require(msg.sender == ds.contractOwner, "Must own the contract.");
-        require(es.totalSupply >= 1 gwei, "POOL_TOKEN_BALANCE_TOO_LOW");
+        require(es.totalSupply >= MIN_AMOUNT, "POOL_TOKEN_BALANCE_TOO_LOW");
 
         for (uint256 i = 0; i < _tokens.length; i ++) {
             bs.tokens.push(IERC20(_tokens[i]));
             bs.inPool[_tokens[i]] = true;
             // requires some initial supply, could be less than 1 gwei, but yea.
-            require(balance(_tokens[i]) >= 1 gwei, "TOKEN_BALANCE_TOO_LOW");
+            require(balance(_tokens[i]) >= MIN_AMOUNT, "TOKEN_BALANCE_TOO_LOW");
         }
 
         // unlock the contract
@@ -53,10 +55,13 @@ contract BasketFacet {
 
         for(uint256 i; i < bs.tokens.length; i ++) {
             IERC20 token = bs.tokens[i];
-            uint256 tokenAmount = balance(address(token)).mul(_amount).div(totalSupply);
+            uint256 balance = balance(address(token));
+            uint256 tokenAmount = balance.mul(_amount).div(totalSupply);
+            require(balance.sub(tokenAmount) >= MIN_AMOUNT, "TOKEN_BALANCE_TOO_LOW");
             require(token.transfer(msg.sender, tokenAmount), "Transfer Failed");
         }
 
+        require(totalSupply.sub(_amount) >= MIN_AMOUNT, "POOL_TOKEN_BALANCE_TOO_LOW");
         LibERC20.burn(msg.sender, _amount);
     }
 

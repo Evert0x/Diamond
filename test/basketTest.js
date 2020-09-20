@@ -93,10 +93,20 @@ contract('FacetTest', async accounts => {
 
         tokens = []
         for (let i = 0; i < 3; i++) {
-          token = await erc20Factory.deployNewToken("TEST ${i}", "TST${i}", parseEther("1000"), web3.eth.defaultAccount)
+          token = await erc20Factory.deployNewToken("TEST ${i}", "TST${i}", parseEther("2000"), web3.eth.defaultAccount)
           address = token.receipt.rawLogs[0].address;
 
           token = new web3.eth.Contract(ERC20.abi, address);
+          await token.methods.transfer(accounts[2], parseEther("1000")).send({
+            from: web3.eth.defaultAccount, gas: 1000000
+          })
+
+          await token.methods.approve(diamond.address, parseEther("100000000")).send(
+            {from: web3.eth.defaultAccount, gas: 1000000}
+          )
+          await token.methods.approve(diamond.address, parseEther("100000000")).send(
+            {from: accounts[2], gas: 1000000}
+          )
           tokens.push(token)
         }
     });
@@ -176,9 +186,6 @@ contract('FacetTest', async accounts => {
         addresses = []
         for (var i = 0; i < tokens.length; i++) {
           await tokens[i].methods.transfer(diamond.address, parseEther("100")).send(
-            {from: web3.eth.defaultAccount, gas: 1000000}
-          )
-          await tokens[i].methods.approve(diamond.address, parseEther("100000000")).send(
             {from: web3.eth.defaultAccount, gas: 1000000}
           )
           addresses.push(tokens[i].options.address)
@@ -274,12 +281,43 @@ contract('FacetTest', async accounts => {
             ).send({from: web3.eth.defaultAccount, gas: 1000000})
           ).to.be.revertedWith("transfer amount exceeds balance")
         })
-        it('Exit fails if it exceeds balance', async () => {
+        it('Exit fails if it exceeds MIN_AMOUNT', async () => {
+          tokensUser = await erc20Facet.methods.balanceOf(web3.eth.defaultAccount).call()
+          expect(tokensUser).to.eq(parseEther("15"))
+
           await expect(
             basketFacet.methods.exitPool(
-              parseEther("20")
+              parseEther("15").sub(1)
             ).send({from: web3.eth.defaultAccount, gas: 1000000})
-          ).to.be.revertedWith("transfer amount exceeds balance")
+          ).to.be.revertedWith("TOKEN_BALANCE_TOO_LOW")
+        })
+        it('Join pool with another account', async () => {
+          poolTotal = await erc20Facet.methods.totalSupply().call()
+          expect(poolTotal).to.eq(parseEther("15"))
+
+          await basketFacet.methods.joinPool(
+            parseEther("15")
+          ).send({from: accounts[2], gas: 1000000})
+
+          for (var i = 0; i < tokens.length; i++) {
+            balanceDiamond = await tokens[i].methods.balanceOf(diamond.address).call()
+            expect(balanceDiamond).to.eq(parseEther("300"))
+
+            balanceUser = await tokens[i].methods.balanceOf(accounts[2]).call()
+            expect(balanceUser).to.eq(parseEther("850"))
+          }
+          tokensUser = await erc20Facet.methods.balanceOf(accounts[2]).call()
+          expect(tokensUser).to.eq(parseEther("15"))
+        })
+        it('Exit fails if it exceeds balance of user', async () => {
+          poolTotal = await erc20Facet.methods.totalSupply().call()
+          expect(poolTotal).to.eq(parseEther("30"))
+
+          await expect(
+             basketFacet.methods.exitPool(
+              parseEther("20")
+             ).send({from: web3.eth.defaultAccount, gas: 1000000})
+          ).to.be.revertedWith("subtraction overflow")
         })
     })
 });
