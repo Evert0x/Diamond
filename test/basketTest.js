@@ -8,8 +8,6 @@ use(solidity);
 const Diamond = artifacts.require('Diamond')
 const DiamondCutFacet = artifacts.require('DiamondCutFacet')
 const DiamondLoupeFacet = artifacts.require('DiamondLoupeFacet')
-const OwnershipFacet = artifacts.require('OwnershipFacet')
-const CallFacet = artifacts.require('CallFacet')
 const BasketFacet = artifacts.require('BasketFacet')
 const ERC20Facet = artifacts.require('ERC20Facet')
 const ERC20Factory = artifacts.require('ERC20Factory')
@@ -19,9 +17,7 @@ contract('FacetTest', async accounts => {
     let diamond;
     let diamondCutFacet
     let diamondLoupeFacet
-    let callFacet;
     let basketFacet;
-    let addresses
     let erc20Facet;
     let erc20Factory;
     let tokens = [];
@@ -57,37 +53,24 @@ contract('FacetTest', async accounts => {
         diamond = await Diamond.deployed()
         diamondCutFacet = new web3.eth.Contract(DiamondCutFacet.abi, diamond.address)
         diamondLoupeFacet = new web3.eth.Contract(DiamondLoupeFacet.abi, diamond.address)
-        const ownershipFacet = new web3.eth.Contract(OwnershipFacet.abi, diamond.address)
-        callFacet = await CallFacet.deployed()
         basketFacet = await BasketFacet.deployed()
         erc20Facet = await ERC20Facet.deployed()
         erc20Factory = await ERC20Factory.deployed()
-        addresses = await diamondLoupeFacet.methods.facetAddresses().call()
-
-        // Attach callFacet to diamond
-        let selectors = getSelectors(callFacet)
-        addresses.push(callFacet.address)
-        await diamondCutFacet.methods.diamondCut(
-          [[callFacet.address, selectors]], zeroAddress, '0x'
-        ).send({ from: web3.eth.defaultAccount, gas: 1000000 })
 
         // Attach basketFacet to diamond
         selectors = getSelectors(basketFacet)
-        addresses.push(basketFacet.address)
         await diamondCutFacet.methods.diamondCut(
           [[basketFacet.address, selectors]], zeroAddress, '0x'
         ).send({ from: web3.eth.defaultAccount, gas: 1000000 })
 
         // Attach erc20facet to diamond
         selectors = getSelectors(erc20Facet)
-        addresses.push(erc20Facet.address)
         await diamondCutFacet.methods.diamondCut(
           [[erc20Facet.address, selectors]], zeroAddress, '0x'
         ).send({ from: web3.eth.defaultAccount, gas: 1000000 })
 
-        // Reinitialize both callFacet, basketFacet and erc20Facet.
+        // Reinitialize both basketFacet and erc20Facet.
         // Using the diamond address
-        callFacet = new web3.eth.Contract(CallFacet.abi, diamond.address);
         basketFacet = new web3.eth.Contract(BasketFacet.abi, diamond.address);
         erc20Facet = new web3.eth.Contract(ERC20Facet.abi, diamond.address);
 
