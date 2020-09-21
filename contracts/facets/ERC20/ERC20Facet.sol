@@ -16,14 +16,25 @@ contract ERC20Facet is IERC20 {
         LibDiamondStorage.DiamondStorage storage ds = LibDiamondStorage.diamondStorage();
         LibERC20Storage.ERC20Storage storage es = LibERC20Storage.erc20Storage();
 
-        address currentOwner = ds.contractOwner;
-        require(msg.sender == currentOwner, "Must own the contract.");
+        require(msg.sender == ds.contractOwner, "Must own the contract.");
 
         LibERC20.mint(msg.sender, _initialSupply);
 
         es.name = _name;
         es.symbol = _symbol;
         es.decimals = _decimals;
+    }
+
+    function name() external view returns (string memory) {
+        return LibERC20Storage.erc20Storage().name;
+    }
+
+    function symbol() external view returns (string memory) {
+        return LibERC20Storage.erc20Storage().symbol;
+    }
+
+    function decimals() external view returns (uint8) {
+        return LibERC20Storage.erc20Storage().decimals;
     }
 
     function approve(address _spender, uint256 _amount) external override returns (bool) {
