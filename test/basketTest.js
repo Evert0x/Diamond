@@ -99,6 +99,13 @@ contract('FacetTest', async accounts => {
         lock = await basketFacet.methods.getLock().call();
         assert.equal(lock, true);
       });
+      it('Test setlock not allowed', async () => {
+        await expect (
+          basketFacet.methods.setLock(1).send(
+            {from: accounts[1], gas: 1000000}
+          )
+        ).to.be.revertedWith("NOT_ALLOWED")
+      });
       it('Check past lock', async () => {
         // set blockNumber to at least 2
         await waitNBlocks(2);

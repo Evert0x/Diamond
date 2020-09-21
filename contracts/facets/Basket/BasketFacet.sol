@@ -76,7 +76,7 @@ contract BasketFacet {
         // Maybe remove the first check
         require(
             msg.sender == LibDiamondStorage.diamondStorage().contractOwner ||
-            msg.sender == address(this)
+            msg.sender == address(this), "NOT_ALLOWED"
         );
         LibBasketStorage.basketStorage().lockBlock = _lock;
     }
