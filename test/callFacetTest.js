@@ -61,7 +61,7 @@ contract('CallFacetTest', async accounts => {
         basketFacet = new web3.eth.Contract(BasketFacet.abi, diamond.address);
     });
 
-    describe.only("Call test", async() => {
+    describe("Call test", async() => {
       it('Test lock call', async () => {
         latestBlock = await web3.eth.getBlockNumber();
         lock = await basketFacet.methods.getLock().call();
