@@ -91,17 +91,17 @@ contract('CallFacetTest', async accounts => {
         await callFacet.methods.call(
           [accounts[4]],
           [[]],
-          [parseEther("10")]
+          [parseEther("9")]
         ).send({from: web3.eth.defaultAccount, gas: 1000000})
 
         ether = await web3.eth.getBalance(diamond.address)
-        expect(ether).to.eq("0")
+        expect(ether).to.eq(parseEther("1"))
 
         userBalanceAfter = await web3.eth.getBalance(accounts[4])
         userBalanceAfter = BigNumber.from(userBalanceAfter)
 
         difference = userBalanceAfter.sub(userBalanceBefore)
-        expect(difference).to.eq(parseEther("10"))
+        expect(difference).to.eq(parseEther("9"))
       });
       it('Send contract erc20 token', async () => {
         token = await erc20Factory.deployNewToken("TEST 12", "TST 12", parseEther("2000"), web3.eth.defaultAccount)
@@ -120,12 +120,46 @@ contract('CallFacetTest', async accounts => {
 
         await callFacet.methods.call(
           [token.options.address],
-          [token.methods.transfer(accounts[0], parseEther("1000")).encodeABI()],
+          [token.methods.transfer(accounts[0], parseEther("800")).encodeABI()],
           [0]
         ).send({from: web3.eth.defaultAccount, gas: 1000000})
 
         balance = await token.methods.balanceOf(diamond.address).call();
-        expect(balance).to.eq(parseEther("0"))
+        expect(balance).to.eq(parseEther("200"))
+      })
+      it('Lock + send ether + send erc20', async () => {
+        latestBlock = await web3.eth.getBlockNumber();
+        lock = await basketFacet.methods.getLock().call();
+        expect(lock).to.eq(false)
+
+        ether = await web3.eth.getBalance(diamond.address)
+        expect(ether).to.eq(parseEther("1"))
+
+        balance = await token.methods.balanceOf(diamond.address).call();
+        expect(balance).to.eq(parseEther("200"))
+
+        await callFacet.methods.call(
+          [
+            basketFacet.options.address,
+            token.options.address,
+            accounts[4]
+          ],
+          [
+            basketFacet.methods.setLock(latestBlock + 2).encodeABI(),
+            token.methods.transfer(accounts[0], parseEther("200")).encodeABI(),
+            []
+          ],
+          [0, 0, parseEther("1")]
+        ).send({from: web3.eth.defaultAccount, gas: 1000000})
+
+        lock = await basketFacet.methods.getLock().call();
+        expect(lock).to.eq(true)
+
+        ether = await web3.eth.getBalance(diamond.address)
+        expect(ether).to.eq("0")
+
+        balance = await token.methods.balanceOf(diamond.address).call();
+        expect(balance).to.eq("0")
       })
     })
 });
