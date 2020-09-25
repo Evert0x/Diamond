@@ -14,13 +14,14 @@ contract BasketFacet is ReentryProtectionFacet {
     uint256 constant MIN_AMOUNT = 1 gwei;
 
     // Before calling the first joinPool, the pools needs to be initialized with token balances
-    function initialize(address[] memory _tokens) external noReentry {
+    function initialize(address[] memory _tokens, uint256 _maxCap) external noReentry {
         LibDiamondStorage.DiamondStorage storage ds = LibDiamondStorage.diamondStorage();
         LibBasketStorage.BasketStorage storage bs = LibBasketStorage.basketStorage();
         LibERC20Storage.ERC20Storage storage es = LibERC20Storage.erc20Storage();
 
         require(msg.sender == ds.contractOwner, "Must own the contract.");
         require(es.totalSupply >= MIN_AMOUNT, "POOL_TOKEN_BALANCE_TOO_LOW");
+        require(es.totalSupply <= _maxCap, "MAX_POOL_CAP_REACHED");
 
         for (uint256 i = 0; i < _tokens.length; i ++) {
             bs.tokens.push(IERC20(_tokens[i]));
@@ -30,13 +31,15 @@ contract BasketFacet is ReentryProtectionFacet {
         }
 
         // unlock the contract
-        this.setLock(block.number-1);
+        this.setMaxCap(_maxCap);
+        this.setLock(block.number.sub(1));
     }
 
     function joinPool(uint256 _amount) external noReentry {
         require(!this.getLock(), "POOL_LOCKED");
         LibBasketStorage.BasketStorage storage bs = LibBasketStorage.basketStorage();
         uint256 totalSupply = LibERC20Storage.erc20Storage().totalSupply;
+        require(totalSupply.add(_amount) < this.getMaxCap(), "MAX_POOL_CAP_REACHED");
 
         for(uint256 i; i < bs.tokens.length; i ++) {
             IERC20 token = bs.tokens[i];
@@ -80,6 +83,18 @@ contract BasketFacet is ReentryProtectionFacet {
             msg.sender == address(this), "NOT_ALLOWED"
         );
         LibBasketStorage.basketStorage().lockBlock = _lock;
+    }
+
+    function getMaxCap() external view returns(uint256){
+        return LibBasketStorage.basketStorage().maxCap;
+    }
+
+    function setMaxCap(uint256 _maxCap) external returns(uint256){
+        require(
+            msg.sender == LibDiamondStorage.diamondStorage().contractOwner ||
+            msg.sender == address(this), "NOT_ALLOWED"
+        );
+        LibBasketStorage.basketStorage().maxCap = _maxCap;
     }
 
     // Seperated balance function to allow yearn like strategies to be hooked up by inheriting from this contract and overriding

@@ -59,6 +59,9 @@ contract('CallFacetTest', async accounts => {
         // Using the diamond address
         callFacet = new web3.eth.Contract(CallFacet.abi, diamond.address);
         basketFacet = new web3.eth.Contract(BasketFacet.abi, diamond.address);
+        await basketFacet.methods.setMaxCap(parseEther("1000")).send({
+          from: web3.eth.defaultAccount, gas: 1000000
+        })
     });
 
     describe("Call test", async() => {

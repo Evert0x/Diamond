@@ -13,7 +13,7 @@ const ERC20Facet = artifacts.require('ERC20Facet')
 const ERC20Factory = artifacts.require('ERC20Factory')
 const ERC20 = artifacts.require('ERC20')
 let zeroAddress = '0x0000000000000000000000000000000000000000'
-contract('FacetTest', async accounts => {
+contract('BasketFacetTest', async accounts => {
     let diamond;
     let diamondCutFacet
     let diamondLoupeFacet
@@ -93,7 +93,26 @@ contract('FacetTest', async accounts => {
           tokens.push(token)
         }
     });
-
+    describe("MaxCap", async() => {
+      it('Check default cap', async () => {
+        maxCap = await basketFacet.methods.getMaxCap().call();
+        expect(maxCap).to.be.eq("0");
+      });
+      it('Test setlock not allowed', async () => {
+        await expect (
+          basketFacet.methods.setMaxCap(parseEther("1000")).send(
+            {from: accounts[1], gas: 1000000}
+          )
+        ).to.be.revertedWith("NOT_ALLOWED")
+      });
+      it('Set lock', async () => {
+        await basketFacet.methods.setMaxCap(parseEther("100")).send(
+          {from: accounts[0], gas: 1000000}
+        )
+        maxCap = await basketFacet.methods.getMaxCap().call();
+        expect(maxCap).to.be.eq(parseEther("100"));
+      });
+    });
     describe("Lock", async() => {
       it('Check default locked', async () => {
         lock = await basketFacet.methods.getLock().call();
@@ -145,7 +164,7 @@ contract('FacetTest', async accounts => {
       it('Not enough pool balance', async () => {
         await expect(
           basketFacet.methods.initialize(
-            [tokens[0].options.address]
+            [tokens[0].options.address], parseEther("10")
           ).send({from: web3.eth.defaultAccount, gas: 1000000})
         ).to.be.revertedWith("POOL_TOKEN_BALANCE_TOO_LOW");
       })
@@ -156,14 +175,21 @@ contract('FacetTest', async accounts => {
 
         await expect(
           basketFacet.methods.initialize(
-            [tokens[0].options.address]
+            [tokens[0].options.address], parseEther("5")
+          ).send({from: web3.eth.defaultAccount, gas: 1000000})
+        ).to.be.revertedWith("MAX_POOL_CAP_REACHED");
+      });
+      it('Not enough token balance', async () => {
+        await expect(
+          basketFacet.methods.initialize(
+            [tokens[0].options.address], parseEther("1000")
           ).send({from: web3.eth.defaultAccount, gas: 1000000})
         ).to.be.revertedWith("TOKEN_BALANCE_TOO_LOW");
       })
       it('Not owner', async () => {
         await expect(
           basketFacet.methods.initialize(
-            []
+            [], parseEther("1000")
           ).send({from: accounts[1], gas: 1000000})
         ).to.be.revertedWith("Must own the contract.");
       })
@@ -186,7 +212,7 @@ contract('FacetTest', async accounts => {
 
         // finaly initialize pool
         await basketFacet.methods.initialize(
-          addresses
+          addresses, parseEther("50000")
         ).send({from: web3.eth.defaultAccount, gas: 1000000})
 
         lock = await basketFacet.methods.getLock().call();
@@ -308,6 +334,23 @@ contract('FacetTest', async accounts => {
               parseEther("20")
              ).send({from: web3.eth.defaultAccount, gas: 1000000})
           ).to.be.revertedWith("subtraction overflow")
+        })
+        it('Join fails if it exceeds max cap', async () => {
+          poolTotal = await erc20Facet.methods.totalSupply().call()
+          expect(poolTotal).to.eq(parseEther("30"))
+
+          tokensUser = await erc20Facet.methods.balanceOf(web3.eth.defaultAccount).call()
+          expect(tokensUser).to.eq(parseEther("15"))
+
+          await basketFacet.methods.setMaxCap(parseEther("35")).send(
+            {from: accounts[0], gas: 1000000}
+          )
+
+          await expect(
+            basketFacet.methods.joinPool(
+              parseEther("10")
+            ).send({from: web3.eth.defaultAccount, gas: 1000000})
+          ).to.be.revertedWith("MAX_POOL_CAP_REACHED")
         })
     })
 });

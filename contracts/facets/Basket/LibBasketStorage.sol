@@ -8,6 +8,7 @@ library LibBasketStorage {
 
     struct BasketStorage {
         uint256 lockBlock;
+        uint256 maxCap;
         IERC20[] tokens;
         mapping(address => bool) inPool;
     }
