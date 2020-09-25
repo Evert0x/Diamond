@@ -6,14 +6,15 @@ import "../ERC20/LibERC20Storage.sol";
 import "../ERC20/LibERC20.sol";
 import "./LibBasketStorage.sol";
 import "../../libraries/LibDiamondStorage.sol";
+import "../Reentry/ReentryProtectionFacet.sol";
 
-contract BasketFacet {
+contract BasketFacet is ReentryProtectionFacet {
     using SafeMath for uint256;
 
     uint256 constant MIN_AMOUNT = 1 gwei;
 
     // Before calling the first joinPool, the pools needs to be initialized with token balances
-    function initialize(address[] memory _tokens) external {
+    function initialize(address[] memory _tokens) external noReentry {
         LibDiamondStorage.DiamondStorage storage ds = LibDiamondStorage.diamondStorage();
         LibBasketStorage.BasketStorage storage bs = LibBasketStorage.basketStorage();
         LibERC20Storage.ERC20Storage storage es = LibERC20Storage.erc20Storage();
@@ -32,7 +33,7 @@ contract BasketFacet {
         this.setLock(block.number-1);
     }
 
-    function joinPool(uint256 _amount) external {
+    function joinPool(uint256 _amount) external noReentry {
         require(!this.getLock(), "POOL_LOCKED");
         LibBasketStorage.BasketStorage storage bs = LibBasketStorage.basketStorage();
         uint256 totalSupply = LibERC20Storage.erc20Storage().totalSupply;
@@ -48,7 +49,7 @@ contract BasketFacet {
 
 
     // Must be overwritten to withdraw from strategies
-    function exitPool(uint256 _amount) external virtual {
+    function exitPool(uint256 _amount) external virtual noReentry {
         require(!this.getLock(), "POOL_LOCKED");
         LibBasketStorage.BasketStorage storage bs = LibBasketStorage.basketStorage();
         uint256 totalSupply = LibERC20Storage.erc20Storage().totalSupply;

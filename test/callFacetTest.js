@@ -76,6 +76,15 @@ contract('CallFacetTest', async accounts => {
         lock = await basketFacet.methods.getLock().call();
         expect(lock).to.eq(false)
       });
+      it('Test reentry call', async () => {
+        await expect(
+          callFacet.methods.call(
+            [basketFacet.options.address],
+            [basketFacet.methods.joinPool(parseEther("1")).encodeABI()],
+            [0]
+          ).send({from: web3.eth.defaultAccount, gas: 1000000})
+        ).to.be.revertedWith("ReentryProtectionFacet.noReentry: reentry detected")
+      });
       it('Send contract ether', async () => {
         ether = await web3.eth.getBalance(diamond.address)
         expect(ether).to.eq("0")
